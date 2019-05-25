@@ -137,8 +137,8 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
 
         # Get sketch currently being edited
         app = adsk.core.Application.get()
-        sketches = app.activeProduct.rootComponent.sketches
-        extrudes = app.activeProduct.rootComponent.features.extrudeFeatures
+        sketches = app.activeProduct.activeComponent.sketches
+        extrudes = app.activeProduct.activeComponent.features.extrudeFeatures
         
         # Find and cast user inputs
         inputs = eventArgs.command.commandInputs
