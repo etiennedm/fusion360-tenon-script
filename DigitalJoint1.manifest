@@ -1,0 +1,10 @@
+{
+	"autodeskProduct":	"Fusion360",
+	"type":	"script",
+	"author":	"EDM",
+	"description":	{
+		"":	"Transform an edge on a wood sheet into a tenon + mortise digital joint."
+	},
+	"supportedOS":	"windows|mac",
+	"editEnabled":	true
+}
