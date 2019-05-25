@@ -199,7 +199,10 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         
         # Extrude
         distance = adsk.core.ValueInput.createByReal(-tenon_height)
-        extrude1 = extrudes.addSimple(filter_profiles(sketch.profiles), distance, adsk.fusion.FeatureOperations.CutFeatureOperation) 
+        extrudeInput = extrudes.createInput(filter_profiles(sketch.profiles), adsk.fusion.FeatureOperations.CutFeatureOperation)
+        extrudeInput.participantBodies = [face.body]
+        extrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(distance), adsk.fusion.ExtentDirections.PositiveExtentDirection)
+        extrudes.add(extrudeInput)
 
         # Force the termination of the command.
         adsk.terminate()   
