@@ -176,7 +176,6 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
             builder.translate(tenon_spacing/2, 0) # Point 2
         else:
             (tenon_width, tenon_spacing) = (tenon_spacing, tenon_width)
-            num_tenons = num_tenons + 1
     
         for i in range(num_tenons):
             if isTenon or i > 0:
@@ -189,11 +188,18 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
             rightArcRight = builder.translate(tenon_clearance_width, 0) # Point 9
             builder.translate(0, -tenon_clearance_depth) # Point 10
             builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 10 = Point 2 for next iteration
+            if not isTenon and i == num_tenons - 1:
+                builder.translate(tenon_spacing/2 - tenon_clearance_width, 0)
+                finalArcLeft = builder.translate(0, tenon_clearance_depth)
+                finalArcRight = builder.translate(tenon_clearance_width, 0)
+                builder.translate(0, -(tenon_depth + tenon_clearance_depth))
 
             # Build arcs
             if isTenon or i > 0:
                 sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], -math.pi)
             sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[rightArcLeft], builder.points[rightArcRight]), builder.points[rightArcLeft], -math.pi)
+            if not isTenon and i == num_tenons - 1:
+                sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[finalArcLeft], builder.points[finalArcRight]), builder.points[finalArcLeft], -math.pi)
     
         builder.translate(tenon_spacing/2, 0)
 
