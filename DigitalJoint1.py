@@ -51,6 +51,7 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         inputs = cmd.commandInputs
         
         # Command UI
+        tenonMortiseSelectionInput = inputs.addBoolValueInput("isTenonBoolID", "Tenon", True, '', True)
         edgeSelectionInput = inputs.addSelectionInput("edgeSelectionInputID", "Tenon Edge", "Select edge to be transformed")    
         edgeSelectionInput.addSelectionFilter("LinearEdges")
         faceSelectionInput = inputs.addSelectionInput("faceSelectionInputID", "Tenon Face", "Select face to be transformed")
@@ -142,6 +143,8 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         # Find and cast user inputs
         inputs = eventArgs.command.commandInputs
         
+        isTenon = inputs.itemById('isTenonBoolID').value
+        
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
         face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
         
@@ -163,14 +166,19 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
 
         # Build edges
         builder = SketchBuilder(startPoint, edgeDirection, edgeNormalDirection) # Point 0 = start point
-        builder.translate(0, tenon_depth) # Point 1
-        builder.translate(tenon_spacing/2, 0) # Point 2
-        
+        if isTenon:
+            builder.translate(0, tenon_depth) # Point 1
+            builder.translate(tenon_spacing/2, 0) # Point 2
+        else:
+            (tenon_width, tenon_spacing) = (tenon_spacing, tenon_width)
+            num_tenons = num_tenons + 1
+    
         for i in range(num_tenons):
-            builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 3
-            leftArcLeft = builder.translate(0, tenon_clearance_depth) # Point 4
-            leftArcRight = builder.translate(tenon_clearance_width, 0) # Point 5
-            builder.translate(0, -(tenon_depth + tenon_clearance_depth)) # Point 6
+            if isTenon or i > 0:
+                builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 3
+                leftArcLeft = builder.translate(0, tenon_clearance_depth) # Point 4
+                leftArcRight = builder.translate(tenon_clearance_width, 0) # Point 5
+                builder.translate(0, -(tenon_depth + tenon_clearance_depth)) # Point 6
             builder.translate(tenon_width, 0) # Point 7
             rightArcLeft = builder.translate(0, tenon_depth + tenon_clearance_depth) # Point 8
             rightArcRight = builder.translate(tenon_clearance_width, 0) # Point 9
@@ -178,9 +186,10 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
             builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 10 = Point 2 for next iteration
 
             # Build arcs
-            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], -math.pi)
+            if isTenon or i > 0:
+                sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], -math.pi)
             sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[rightArcLeft], builder.points[rightArcRight]), builder.points[rightArcLeft], -math.pi)
-        
+    
         builder.translate(tenon_spacing/2, 0)
 
         points = builder.points
