@@ -203,10 +203,9 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
                 sketch.sketchCurves.sketchLines.addByTwoPoints(points[i-1], points[i])
         
         # Extrude
-        distance = adsk.core.ValueInput.createByReal(-tenon_height)
         extrudeInput = extrudes.createInput(filter_profiles(sketch.profiles), adsk.fusion.FeatureOperations.CutFeatureOperation)
         extrudeInput.participantBodies = [face.body]
-        extrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(distance), adsk.fusion.ExtentDirections.PositiveExtentDirection)
+        extrudeInput.setOneSideExtent(adsk.fusion.ThroughAllExtentDefinition.create(), adsk.fusion.ExtentDirections.PositiveExtentDirection)
         extrudes.add(extrudeInput)
 
         # Force the termination of the command.
