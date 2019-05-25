@@ -51,11 +51,16 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         inputs = cmd.commandInputs
         
         # Command UI
-        tenonMortiseSelectionInput = inputs.addBoolValueInput("isTenonBoolID", "Tenon", True, '', True)
         edgeSelectionInput = inputs.addSelectionInput("edgeSelectionInputID", "Tenon Edge", "Select edge to be transformed")    
         edgeSelectionInput.addSelectionFilter("LinearEdges")
         faceSelectionInput = inputs.addSelectionInput("faceSelectionInputID", "Tenon Face", "Select face to be transformed")
         faceSelectionInput.addSelectionFilter("PlanarFaces")
+        inputs.addBoolValueInput("isTenonInputID", "Tenon", True, '', True)
+        inputs.addIntegerSpinnerCommandInput("numTenonInputID", "Number of tenons", 1, 10, 1, 1)
+        inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(1))
+        inputs.addValueInput("tenonDepthInputID", "Tenon Depth", 'mm', adsk.core.ValueInput.createByReal(1.5))
+        inputs.addValueInput("tenonClearanceDepthInputID", "Tenon Clearance Depth", 'mm', adsk.core.ValueInput.createByReal(1))
+        inputs.addValueInput("tenonClearanceWidthInputID", "Tenon Clearance Width", 'mm', adsk.core.ValueInput.createByReal(1))
         
         # Connect to the execute event.
         onExecute = CommandExecuteHandler()
@@ -126,14 +131,6 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
     def notify(self, args):
         import math
         eventArgs = adsk.core.CommandEventArgs.cast(args)
-        
-        # Parameters
-        tenon_width = 5
-        tenon_depth = 1
-        tenon_height = 1
-        tenon_clearance_width = 1
-        tenon_clearance_depth = 1
-        num_tenons = 3
 
         # Get sketch currently being edited
         app = adsk.core.Application.get()
@@ -143,7 +140,15 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         # Find and cast user inputs
         inputs = eventArgs.command.commandInputs
         
-        isTenon = inputs.itemById('isTenonBoolID').value
+        # Parameters
+        tenon_width = inputs.itemById('tenonWidthInputID').value
+        tenon_depth = inputs.itemById('tenonDepthInputID').value
+        tenon_height = 1
+        tenon_clearance_width = inputs.itemById('tenonClearanceWidthInputID').value 
+        tenon_clearance_depth = inputs.itemById('tenonClearanceDepthInputID').value
+        num_tenons = inputs.itemById('numTenonInputID').value
+        
+        isTenon = inputs.itemById('isTenonInputID').value
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
         face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
