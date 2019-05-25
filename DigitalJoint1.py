@@ -56,6 +56,7 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         faceSelectionInput = inputs.addSelectionInput("faceSelectionInputID", "Tenon Face", "Select face to be transformed")
         faceSelectionInput.addSelectionFilter("PlanarFaces")
         inputs.addBoolValueInput("isTenonInputID", "Tenon", True, '', True)
+        inputs.addBoolValueInput("isMissingEdgesID", "Missing Sides", True, '', False)
         inputs.addIntegerSpinnerCommandInput("numTenonInputID", "Number of tenons", 1, 10, 1, 1)
         inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(1))
         inputs.addValueInput("tenonDepthInputID", "Tenon Depth", 'mm', adsk.core.ValueInput.createByReal(1.5))
@@ -149,6 +150,7 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         num_tenons = inputs.itemById('numTenonInputID').value
         
         isTenon = inputs.itemById('isTenonInputID').value
+        isMissingSides = inputs.itemById('isMissingEdgesID').value
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
         face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
@@ -159,8 +161,11 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         edgeInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('edgeSelectionInputID'))
         edge = adsk.fusion.BRepEdge.cast(edgeInput.selection(0).entity)
         edgeLength = edge.length
+        if isMissingSides:
+            edgeLength += 2 * tenon_depth
         
         tenon_spacing = (edgeLength - num_tenons*tenon_width)/(num_tenons + 1)
+        print("Tenon spacing is {}".format(tenon_spacing))
 
         # Compute sketch edge direction and normal
         startPoint = sketch.modelToSketchSpace(edge.startVertex.geometry.copy())
@@ -179,7 +184,10 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
     
         for i in range(num_tenons):
             if isTenon or i > 0:
-                builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 3
+                if isMissingSides and i == 0:
+                    builder.translate(tenon_spacing/2 - tenon_clearance_width - tenon_depth, 0) # Point 3
+                else:
+                    builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 3
                 leftArcLeft = builder.translate(0, tenon_clearance_depth) # Point 4
                 leftArcRight = builder.translate(tenon_clearance_width, 0) # Point 5
                 builder.translate(0, -(tenon_depth + tenon_clearance_depth)) # Point 6
