@@ -58,9 +58,9 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         inputs.addBoolValueInput("isTenonInputID", "Tenon", True, '', True)
         inputs.addBoolValueInput("isMissingEdgesID", "Missing Sides", True, '', False)
         inputs.addIntegerSpinnerCommandInput("numTenonInputID", "Number of tenons", 1, 10, 1, 1)
-        inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(1))
+        inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(5))
         inputs.addValueInput("tenonDepthInputID", "Tenon Depth", 'mm', adsk.core.ValueInput.createByReal(1.5))
-        inputs.addValueInput("tenonClearanceDepthInputID", "Tenon Clearance Depth", 'mm', adsk.core.ValueInput.createByReal(1))
+        inputs.addValueInput("tenonClearanceDepthInputID", "Tenon Clearance Depth", 'mm', adsk.core.ValueInput.createByReal(0))
         inputs.addValueInput("tenonClearanceWidthInputID", "Tenon Clearance Width", 'mm', adsk.core.ValueInput.createByReal(1))
         
         # Connect to the execute event.
