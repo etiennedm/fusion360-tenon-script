@@ -57,6 +57,7 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         faceSelectionInput.addSelectionFilter("PlanarFaces")
         inputs.addBoolValueInput("isTenonInputID", "Tenon", True, '', True)
         inputs.addBoolValueInput("isMissingEdgesID", "Missing Sides", True, '', False)
+        inputs.addBoolValueInput("invertDirectionID", "Invert Normal Direction", True, '', False)
         inputs.addIntegerSpinnerCommandInput("numTenonInputID", "Number of tenons", 1, 10, 1, 1)
         inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(5))
         inputs.addValueInput("tenonDepthInputID", "Tenon Depth", 'mm', adsk.core.ValueInput.createByReal(1.5))
@@ -161,6 +162,10 @@ class MortiseTenonBuilder:
     def is_missing_sides(self, value):
         self.is_missing_sides = value
         return self
+        
+    def invert_normal_dir(self, value):
+        self.invert_normal_dir = value
+        return self
 
 def build_mortise_tenon(b, edge, face, sketches, extrudes):
     import math
@@ -180,7 +185,10 @@ def build_mortise_tenon(b, edge, face, sketches, extrudes):
     endPoint = sketch.modelToSketchSpace(edge.endVertex.geometry.copy())
     edgeDirection = startPoint.vectorTo(endPoint)
     edgeDirection.normalize()
-    edgeNormalDirection = edgeDirection.crossProduct(adsk.core.Vector3D.create(0, 0, -1.0))
+    edgeNormalDirection = edgeDirection.crossProduct(adsk.core.Vector3D.create(0, 0, 1.0 if b.invert_normal_dir else -1.0))
+    print("Normal direction is {} (invert_normal_dir = {} / is_tenon = {})".format(edgeNormalDirection, b.invert_normal_dir, b.is_tenon))
+    
+    arc_angle = math.pi if b.invert_normal_dir else -math.pi
 
     # Build edges
     builder = SketchBuilder(startPoint, edgeDirection, edgeNormalDirection) # Point 0 = start point
@@ -212,10 +220,10 @@ def build_mortise_tenon(b, edge, face, sketches, extrudes):
 
         # Build arcs
         if b.is_tenon or i > 0:
-            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], -math.pi)
-        sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[rightArcLeft], builder.points[rightArcRight]), builder.points[rightArcLeft], -math.pi)
+            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], arc_angle)
+        sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[rightArcLeft], builder.points[rightArcRight]), builder.points[rightArcLeft], arc_angle)
         if not b.is_tenon and i == b.num_tenons - 1:
-            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[finalArcLeft], builder.points[finalArcRight]), builder.points[finalArcLeft], -math.pi)
+            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[finalArcLeft], builder.points[finalArcRight]), builder.points[finalArcLeft], arc_angle)
     
     builder.translate(tenon_spacing/2, 0)
 
@@ -253,6 +261,7 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         b.num_tenons(inputs.itemById('numTenonInputID').value)
         b.is_tenon(inputs.itemById('isTenonInputID').value)
         b.is_missing_sides(inputs.itemById('isMissingEdgesID').value)
+        b.invert_normal_dir(inputs.itemById('invertDirectionID').value)
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
         face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
@@ -287,6 +296,7 @@ class CommandExecutePreviewHandler(adsk.core.CommandEventHandler):
         b.num_tenons(inputs.itemById('numTenonInputID').value)
         b.is_tenon(inputs.itemById('isTenonInputID').value)
         b.is_missing_sides(inputs.itemById('isMissingEdgesID').value)
+        b.invert_normal_dir(inputs.itemById('invertDirectionID').value)
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
         face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
