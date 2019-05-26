@@ -67,6 +67,11 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         onExecute = CommandExecuteHandler()
         cmd.execute.add(onExecute)
         handlers.append(onExecute)
+        
+        # Connect to the inputChanged event.
+        onExecutePreview = CommandExecutePreviewHandler()
+        cmd.executePreview.add(onExecutePreview)
+        handlers.append(onExecutePreview)
    
 
 def print_Point3D(point):
@@ -260,6 +265,40 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         # Force the termination of the command.
         adsk.terminate()   
         
+# Event handler for the executePreview event.
+class CommandExecutePreviewHandler(adsk.core.CommandEventHandler):
+    def __init__(self):
+        super().__init__()
+    def notify(self, args):
+        eventArgs = adsk.core.CommandEventArgs.cast(args)
+
+# Get sketch currently being edited
+        sketches = adsk.core.Application.get().activeProduct.activeComponent.sketches
+        extrudes = adsk.core.Application.get().activeProduct.activeComponent.features.extrudeFeatures
+        
+        # Find and cast user inputs
+        inputs = eventArgs.command.commandInputs
+        
+        b = MortiseTenonBuilder()
+        b.width(inputs.itemById('tenonWidthInputID').value)
+        b.depth(inputs.itemById('tenonDepthInputID').value)
+        b.clearance_width(inputs.itemById('tenonClearanceWidthInputID').value)
+        b.clearance_depth(inputs.itemById('tenonClearanceDepthInputID').value)
+        b.num_tenons(inputs.itemById('numTenonInputID').value)
+        b.is_tenon(inputs.itemById('isTenonInputID').value)
+        b.is_missing_sides(inputs.itemById('isMissingEdgesID').value)
+        
+        faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
+        face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
+       
+        edgeInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('edgeSelectionInputID'))
+        edge = adsk.fusion.BRepEdge.cast(edgeInput.selection(0).entity)
+
+        build_mortise_tenon(b, edge, face, sketches, extrudes) 
+        
+        # Set the isValidResult property to use these results at the final result.
+        # This will result in the execute event not being fired.
+        eventArgs.isValidResult = True
 
 def stop(context):
     try:
