@@ -125,103 +125,137 @@ def filter_profiles(profiles):
             
     return filtered_profiles
     
+class MortiseTenonBuilder:
+    def __init__(self):
+        pass
+    
+    def width(self, value):
+        self.width = value
+        return self
+    
+    def depth(self, value):
+        self.depth = value
+        return self
+        
+    def clearance_width(self, value):
+        self.clearance_width = value
+        return self
+
+    def clearance_depth(self, value):
+        self.clearance_depth = value
+        return self
+
+    def num_tenons(self, value):
+        self.num_tenons = value
+        return self
+    
+    def is_tenon(self, value):
+        self.is_tenon = value
+        return self
+
+    def is_missing_sides(self, value):
+        self.is_missing_sides = value
+        return self
+
+def build_mortise_tenon(b, edge, face, sketches, extrudes):
+    import math
+    
+    # Create sketch on input face
+    sketch = sketches.add(face)
+
+    edgeLength = edge.length
+    if b.is_missing_sides:
+        edgeLength += 2 * b.depth
+    
+    tenon_spacing = (edgeLength - b.num_tenons*b.width)/(b.num_tenons + 1)
+    print("Tenon spacing is {}".format(tenon_spacing))
+
+    # Compute sketch edge direction and normal
+    startPoint = sketch.modelToSketchSpace(edge.startVertex.geometry.copy())
+    endPoint = sketch.modelToSketchSpace(edge.endVertex.geometry.copy())
+    edgeDirection = startPoint.vectorTo(endPoint)
+    edgeDirection.normalize()
+    edgeNormalDirection = edgeDirection.crossProduct(adsk.core.Vector3D.create(0, 0, -1.0))
+
+    # Build edges
+    builder = SketchBuilder(startPoint, edgeDirection, edgeNormalDirection) # Point 0 = start point
+    if b.is_tenon:
+        builder.translate(0, b.depth) # Point 1
+        builder.translate(tenon_spacing/2, 0) # Point 2
+    else:
+        (b.width, tenon_spacing) = (tenon_spacing, b.width)
+    
+    for i in range(b.num_tenons):
+        if b.is_tenon or i > 0:
+            if b.is_missing_sides and i == 0:
+                builder.translate(tenon_spacing/2 - b.clearance_width - b.depth, 0) # Point 3
+            else:
+                builder.translate(tenon_spacing/2 - b.clearance_width, 0) # Point 3
+            leftArcLeft = builder.translate(0, b.clearance_depth) # Point 4
+            leftArcRight = builder.translate(b.clearance_width, 0) # Point 5
+            builder.translate(0, -(b.depth + b.clearance_depth)) # Point 6
+        builder.translate(b.width, 0) # Point 7
+        rightArcLeft = builder.translate(0, b.depth + b.clearance_depth) # Point 8
+        rightArcRight = builder.translate(b.clearance_width, 0) # Point 9
+        builder.translate(0, -b.clearance_depth) # Point 10
+        builder.translate(tenon_spacing/2 - b.clearance_width, 0) # Point 10 = Point 2 for next iteration
+        if not b.is_tenon and i == b.num_tenons - 1:
+            builder.translate(tenon_spacing/2 - b.clearance_width, 0)
+            finalArcLeft = builder.translate(0, b.clearance_depth)
+            finalArcRight = builder.translate(b.clearance_width, 0)
+            builder.translate(0, -(b.depth + b.clearance_depth))
+
+        # Build arcs
+        if b.is_tenon or i > 0:
+            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], -math.pi)
+        sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[rightArcLeft], builder.points[rightArcRight]), builder.points[rightArcLeft], -math.pi)
+        if not b.is_tenon and i == b.num_tenons - 1:
+            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[finalArcLeft], builder.points[finalArcRight]), builder.points[finalArcLeft], -math.pi)
+    
+    builder.translate(tenon_spacing/2, 0)
+
+    points = builder.points
+    for i in range(len(points)):
+        if i > 0:
+            sketch.sketchCurves.sketchLines.addByTwoPoints(points[i-1], points[i])
+    
+    # Extrude
+    extrudeInput = extrudes.createInput(filter_profiles(sketch.profiles), adsk.fusion.FeatureOperations.CutFeatureOperation)
+    extrudeInput.participantBodies = [face.body]
+    distance = adsk.core.ValueInput.createByReal(b.depth)
+    extrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(distance), adsk.fusion.ExtentDirections.NegativeExtentDirection)
+    extrudes.add(extrudeInput)
+    
 # Event handler for the execute event.
 class CommandExecuteHandler(adsk.core.CommandEventHandler):
     def __init__(self):
         super().__init__()
     def notify(self, args):
-        import math
         eventArgs = adsk.core.CommandEventArgs.cast(args)
 
         # Get sketch currently being edited
-        app = adsk.core.Application.get()
-        sketches = app.activeProduct.activeComponent.sketches
-        extrudes = app.activeProduct.activeComponent.features.extrudeFeatures
+        sketches = adsk.core.Application.get().activeProduct.activeComponent.sketches
+        extrudes = adsk.core.Application.get().activeProduct.activeComponent.features.extrudeFeatures
         
         # Find and cast user inputs
         inputs = eventArgs.command.commandInputs
         
-        # Parameters
-        tenon_width = inputs.itemById('tenonWidthInputID').value
-        tenon_depth = inputs.itemById('tenonDepthInputID').value
-        tenon_height = 1
-        tenon_clearance_width = inputs.itemById('tenonClearanceWidthInputID').value 
-        tenon_clearance_depth = inputs.itemById('tenonClearanceDepthInputID').value
-        num_tenons = inputs.itemById('numTenonInputID').value
-        
-        isTenon = inputs.itemById('isTenonInputID').value
-        isMissingSides = inputs.itemById('isMissingEdgesID').value
+        b = MortiseTenonBuilder()
+        b.width(inputs.itemById('tenonWidthInputID').value)
+        b.depth(inputs.itemById('tenonDepthInputID').value)
+        b.clearance_width(inputs.itemById('tenonClearanceWidthInputID').value)
+        b.clearance_depth(inputs.itemById('tenonClearanceDepthInputID').value)
+        b.num_tenons(inputs.itemById('numTenonInputID').value)
+        b.is_tenon(inputs.itemById('isTenonInputID').value)
+        b.is_missing_sides(inputs.itemById('isMissingEdgesID').value)
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
         face = adsk.fusion.BRepFace.cast(faceInput.selection(0).entity)
-        
-        # Create sketch on input face
-        sketch = sketches.add(face)
-        
+       
         edgeInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('edgeSelectionInputID'))
         edge = adsk.fusion.BRepEdge.cast(edgeInput.selection(0).entity)
-        edgeLength = edge.length
-        if isMissingSides:
-            edgeLength += 2 * tenon_depth
-        
-        tenon_spacing = (edgeLength - num_tenons*tenon_width)/(num_tenons + 1)
-        print("Tenon spacing is {}".format(tenon_spacing))
 
-        # Compute sketch edge direction and normal
-        startPoint = sketch.modelToSketchSpace(edge.startVertex.geometry.copy())
-        endPoint = sketch.modelToSketchSpace(edge.endVertex.geometry.copy())
-        edgeDirection = startPoint.vectorTo(endPoint)
-        edgeDirection.normalize()
-        edgeNormalDirection = edgeDirection.crossProduct(adsk.core.Vector3D.create(0, 0, -1.0))
-
-        # Build edges
-        builder = SketchBuilder(startPoint, edgeDirection, edgeNormalDirection) # Point 0 = start point
-        if isTenon:
-            builder.translate(0, tenon_depth) # Point 1
-            builder.translate(tenon_spacing/2, 0) # Point 2
-        else:
-            (tenon_width, tenon_spacing) = (tenon_spacing, tenon_width)
-    
-        for i in range(num_tenons):
-            if isTenon or i > 0:
-                if isMissingSides and i == 0:
-                    builder.translate(tenon_spacing/2 - tenon_clearance_width - tenon_depth, 0) # Point 3
-                else:
-                    builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 3
-                leftArcLeft = builder.translate(0, tenon_clearance_depth) # Point 4
-                leftArcRight = builder.translate(tenon_clearance_width, 0) # Point 5
-                builder.translate(0, -(tenon_depth + tenon_clearance_depth)) # Point 6
-            builder.translate(tenon_width, 0) # Point 7
-            rightArcLeft = builder.translate(0, tenon_depth + tenon_clearance_depth) # Point 8
-            rightArcRight = builder.translate(tenon_clearance_width, 0) # Point 9
-            builder.translate(0, -tenon_clearance_depth) # Point 10
-            builder.translate(tenon_spacing/2 - tenon_clearance_width, 0) # Point 10 = Point 2 for next iteration
-            if not isTenon and i == num_tenons - 1:
-                builder.translate(tenon_spacing/2 - tenon_clearance_width, 0)
-                finalArcLeft = builder.translate(0, tenon_clearance_depth)
-                finalArcRight = builder.translate(tenon_clearance_width, 0)
-                builder.translate(0, -(tenon_depth + tenon_clearance_depth))
-
-            # Build arcs
-            if isTenon or i > 0:
-                sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[leftArcLeft], builder.points[leftArcRight]), builder.points[leftArcLeft], -math.pi)
-            sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[rightArcLeft], builder.points[rightArcRight]), builder.points[rightArcLeft], -math.pi)
-            if not isTenon and i == num_tenons - 1:
-                sketch.sketchCurves.sketchArcs.addByCenterStartSweep(builder.center(builder.points[finalArcLeft], builder.points[finalArcRight]), builder.points[finalArcLeft], -math.pi)
-    
-        builder.translate(tenon_spacing/2, 0)
-
-        points = builder.points
-        for i in range(len(points)):
-            if i > 0:
-                sketch.sketchCurves.sketchLines.addByTwoPoints(points[i-1], points[i])
-        
-        # Extrude
-        extrudeInput = extrudes.createInput(filter_profiles(sketch.profiles), adsk.fusion.FeatureOperations.CutFeatureOperation)
-        extrudeInput.participantBodies = [face.body]
-        distance = adsk.core.ValueInput.createByReal(tenon_depth)
-        extrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(distance), adsk.fusion.ExtentDirections.NegativeExtentDirection)
-        extrudes.add(extrudeInput)
+        build_mortise_tenon(b, edge, face, sketches, extrudes) 
 
         # Force the termination of the command.
         adsk.terminate()   
