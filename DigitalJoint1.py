@@ -306,9 +306,6 @@ class CommandExecutePreviewHandler(adsk.core.CommandEventHandler):
 
         build_mortise_tenon(b, edge, face, sketches, extrudes) 
         
-        # Set the isValidResult property to use these results at the final result.
-        # This will result in the execute event not being fired.
-        eventArgs.isValidResult = True
 
 def stop(context):
     try:
