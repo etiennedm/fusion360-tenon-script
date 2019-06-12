@@ -56,7 +56,8 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         faceSelectionInput = inputs.addSelectionInput("faceSelectionInputID", "Tenon Face", "Select face to be transformed")
         faceSelectionInput.addSelectionFilter("PlanarFaces")
         inputs.addBoolValueInput("isTenonInputID", "Tenon", True, '', True)
-        inputs.addBoolValueInput("isMissingEdgesID", "Missing Sides", True, '', False)
+        inputs.addBoolValueInput("isMissingStartEdgeID", "Missing Start Side", True, '', False)
+        inputs.addBoolValueInput("isMissingEndEdgeID", "Missing End Side", True, '', False)
         inputs.addBoolValueInput("invertDirectionID", "Invert Normal Direction", True, '', False)
         inputs.addIntegerSpinnerCommandInput("numTenonInputID", "Number of tenons", 1, 10, 1, 1)
         inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(5))
@@ -159,10 +160,14 @@ class MortiseTenonBuilder:
         self.is_tenon = value
         return self
 
-    def is_missing_sides(self, value):
-        self.is_missing_sides = value
+    def is_missing_start_side(self, value):
+        self.is_missing_start_side = value
         return self
-        
+
+    def is_missing_end_side(self, value):
+        self.is_missing_end_side = value
+        return self
+
     def invert_normal_dir(self, value):
         self.invert_normal_dir = value
         return self
@@ -174,7 +179,7 @@ def build_mortise_tenon(b, edge, face, sketches, extrudes):
     sketch = sketches.add(face)
 
     edgeLength = edge.length
-    if b.is_missing_sides:
+    if b.is_missing_start_side and b.is_missing_end_side:
         edgeLength += 2 * b.depth
     
     tenon_spacing = (edgeLength - b.num_tenons*b.width)/(b.num_tenons + 1)
@@ -200,8 +205,14 @@ def build_mortise_tenon(b, edge, face, sketches, extrudes):
     
     for i in range(b.num_tenons):
         if b.is_tenon or i > 0:
-            if b.is_missing_sides and i == 0:
-                builder.translate(tenon_spacing/2 - b.clearance_width - b.depth, 0) # Point 3
+            if (b.is_missing_start_side or b.is_missing_end_side) and i == 0:
+                if b.is_missing_start_side and b.is_missing_end_side:
+                    side_offset = b.depth
+                elif b.is_missing_start_side:
+                    side_offset = b.depth
+                else:
+                    side_offset = 0
+                builder.translate(tenon_spacing/2 - b.clearance_width - side_offset, 0) # Point 3
             else:
                 builder.translate(tenon_spacing/2 - b.clearance_width, 0) # Point 3
             leftArcLeft = builder.translate(0, b.clearance_depth) # Point 4
@@ -260,7 +271,8 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         b.clearance_depth(inputs.itemById('tenonClearanceDepthInputID').value)
         b.num_tenons(inputs.itemById('numTenonInputID').value)
         b.is_tenon(inputs.itemById('isTenonInputID').value)
-        b.is_missing_sides(inputs.itemById('isMissingEdgesID').value)
+        b.is_missing_start_side(inputs.itemById('isMissingStartEdgeID').value)
+        b.is_missing_end_side(inputs.itemById('isMissingEndEdgeID').value)
         b.invert_normal_dir(inputs.itemById('invertDirectionID').value)
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
@@ -295,7 +307,8 @@ class CommandExecutePreviewHandler(adsk.core.CommandEventHandler):
         b.clearance_depth(inputs.itemById('tenonClearanceDepthInputID').value)
         b.num_tenons(inputs.itemById('numTenonInputID').value)
         b.is_tenon(inputs.itemById('isTenonInputID').value)
-        b.is_missing_sides(inputs.itemById('isMissingEdgesID').value)
+        b.is_missing_start_side(inputs.itemById('isMissingStartEdgeID').value)
+        b.is_missing_end_side(inputs.itemById('isMissingEndEdgeID').value)
         b.invert_normal_dir(inputs.itemById('invertDirectionID').value)
         
         faceInput = adsk.core.SelectionCommandInput.cast(inputs.itemById('faceSelectionInputID'))
