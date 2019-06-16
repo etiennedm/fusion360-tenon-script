@@ -63,6 +63,7 @@ class CommandCreatedEventHandler(adsk.core.CommandCreatedEventHandler):
         inputs.addValueInput("tenonWidthInputID", "Tenon Width", 'mm', adsk.core.ValueInput.createByReal(5))
         inputs.addValueInput("tenonDepthInputID", "Tenon Depth", 'mm', adsk.core.ValueInput.createByReal(1.5))
         inputs.addValueInput("tenonClearanceDepthInputID", "Tenon Clearance Depth", 'mm', adsk.core.ValueInput.createByReal(0))
+        inputs.addValueInput("tenonThicknessInputID", "Tenon Thickness", 'mm', adsk.core.ValueInput.createByReal(1))
         inputs.addValueInput("tenonClearanceWidthInputID", "Tenon Clearance Width", 'mm', adsk.core.ValueInput.createByReal(1))
         inputs.addValueInput("tenonPlayID", "Tenon Play Clearance", 'mm', adsk.core.ValueInput.createByReal(0.05))
 
@@ -143,6 +144,10 @@ class MortiseTenonBuilder:
 
     def depth(self, value):
         self.depth = value
+        return self
+
+    def thickness(self, value):
+        self.thickness = value
         return self
 
     def clearance_width(self, value):
@@ -262,7 +267,7 @@ def build_mortise_tenon(b, edge, face, sketches, extrudes):
     # Extrude
     extrudeInput = extrudes.createInput(filter_profiles(sketch.profiles), adsk.fusion.FeatureOperations.CutFeatureOperation)
     extrudeInput.participantBodies = [face.body]
-    distance = adsk.core.ValueInput.createByReal(b.depth)
+    distance = adsk.core.ValueInput.createByReal(b.thickness)
     extrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(distance), adsk.fusion.ExtentDirections.NegativeExtentDirection)
     extrudes.add(extrudeInput)
 
@@ -283,6 +288,7 @@ class CommandExecuteHandler(adsk.core.CommandEventHandler):
         b = MortiseTenonBuilder()
         b.width(inputs.itemById('tenonWidthInputID').value)
         b.depth(inputs.itemById('tenonDepthInputID').value)
+        b.thickness(inputs.itemById('tenonThicknessInputID').value)
         b.clearance_width(inputs.itemById('tenonClearanceWidthInputID').value)
         b.clearance_depth(inputs.itemById('tenonClearanceDepthInputID').value)
         b.play(inputs.itemById('tenonPlayID').value)
@@ -320,6 +326,7 @@ class CommandExecutePreviewHandler(adsk.core.CommandEventHandler):
         b = MortiseTenonBuilder()
         b.width(inputs.itemById('tenonWidthInputID').value)
         b.depth(inputs.itemById('tenonDepthInputID').value)
+        b.thickness(inputs.itemById('tenonThicknessInputID').value)
         b.clearance_width(inputs.itemById('tenonClearanceWidthInputID').value)
         b.clearance_depth(inputs.itemById('tenonClearanceDepthInputID').value)
         b.play(inputs.itemById('tenonPlayID').value)
